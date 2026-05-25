@@ -23,6 +23,7 @@ PROGRESS_URL = "https://api.brightdata.com/datasets/v3/progress/{snapshot_id}"
 SNAPSHOT_URL = "https://api.brightdata.com/datasets/v3/snapshot/{snapshot_id}?format=json"
 POLL_INTERVAL = 10  # seconds between status checks
 DEFAULT_OUTPUT_DIR = "Downloads"
+DEFAULT_RESULT_DIR = "Result"
 CONFIG_PATH = Path(__file__).parent.parent / "config.json"
 
 
@@ -105,6 +106,31 @@ def poll_until_ready(api_key: str, snapshot_id: str, timeout: int) -> None:
     raise TimeoutError(f"Snapshot not ready after {timeout}s")
 
 
+def extract_results(source_path: Path, result_dir: Path) -> list:
+    """Read a raw snapshot JSON and write one slim file per video into result_dir."""
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    folder = result_dir / date_str
+    folder.mkdir(parents=True, exist_ok=True)
+
+    items = json.loads(source_path.read_text(encoding="utf-8"))
+    saved = []
+    for item in items:
+        video_id = item.get("video_id") or item.get("shortcode")
+        if not video_id:
+            continue
+        slim = {
+            "url": item.get("url"),
+            "title": item.get("title"),
+            "youtuber": item.get("youtuber"),
+            "handle_name": item.get("handle_name"),
+            "transcript": item.get("transcript"),
+        }
+        out = folder / f"{video_id}.json"
+        out.write_text(json.dumps(slim, ensure_ascii=False, indent=2), encoding="utf-8")
+        saved.append(out)
+    return saved
+
+
 def download_snapshot(api_key: str, snapshot_id: str, output_path: Path) -> None:
     """Download the finished snapshot JSON to output_path."""
     headers = {"Authorization": f"Bearer {api_key}"}
@@ -157,14 +183,21 @@ The number <n> is auto-incremented so parallel invocations never overwrite each 
         "--output-dir",
         default=None,
         metavar="DIR",
-        help="Base directory for output (overrides config.json; default: Downloads)",
+        help="Base directory for raw snapshots (overrides config.json; default: Downloads)",
+    )
+    parser.add_argument(
+        "--result-dir",
+        default=None,
+        metavar="DIR",
+        help="Base directory for extracted results (overrides config.json; default: Result)",
     )
 
     args = parser.parse_args()
 
-    # Priority: --output-dir CLI arg > config.json > built-in default
+    # Priority: CLI arg > config.json > built-in default
     config = load_config()
     output_dir = args.output_dir or config.get("output_dir") or DEFAULT_OUTPUT_DIR
+    result_dir = Path(args.result_dir or config.get("result_dir") or DEFAULT_RESULT_DIR)
 
     # Collect raw inputs from positional args and/or file
     raw_inputs = list(args.urls)
@@ -222,7 +255,13 @@ The number <n> is auto-incremented so parallel invocations never overwrite each 
 
     print(f"Downloading snapshot to {output_path} ...")
     download_snapshot(api_key, snapshot_id, output_path)
-    print(f"Done. Saved to {output_path}")
+    print(f"Saved raw snapshot to {output_path}")
+
+    print(f"Extracting results to {result_dir} ...")
+    saved = extract_results(output_path, result_dir)
+    for p in saved:
+        print(f"  {p}")
+    print(f"Done. {len(saved)} result file(s) written.")
 
 
 if __name__ == "__main__":

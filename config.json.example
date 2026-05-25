@@ -1,3 +1,4 @@
 {
-  "output_dir": "Downloads"
+  "output_dir": "Downloads",
+  "result_dir": "Result"
 }

@@ -13,6 +13,7 @@ develop-eggs/
 dist/
 downloads/
 Downloads/
+Result/
 config.json
 eggs/
 .eggs/
