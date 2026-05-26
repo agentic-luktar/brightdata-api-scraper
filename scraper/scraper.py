@@ -12,6 +12,8 @@ from urllib.parse import urlparse, parse_qs
 import requests
 from dotenv import load_dotenv
 
+from . import __version__
+
 load_dotenv()
 
 DATASET_ID = "gd_lk56epmy2i5g7lzu0k"
@@ -142,6 +144,7 @@ def download_snapshot(api_key: str, snapshot_id: str, output_path: Path) -> None
 
 
 def main():
+    print(f"Brightdata API Scraper version {__version__}")
     parser = argparse.ArgumentParser(
         prog="python -m scraper",
         description="Download YouTube video data via the Brightdata scraping API.",
